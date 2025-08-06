@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  store-device-service:
+  workhorse:
     build: .
     ports:
       - "8081:8080"
@@ -11,7 +11,10 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/store-device-service
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: root
-      SPRING_APPLICATION_NAME: store-device-service
+      SOURCE_DATASOURCE_URL: jdbc:postgresql://db:5432/market-master-data
+      SOURCE_DATASOURCE_USERNAME: postgres
+      SOURCE_DATASOURCE_PASSWORD: root
+      SPRING_APPLICATION_NAME: workhorse
       SERVER_PORT: 8080
     networks:
       - backend
