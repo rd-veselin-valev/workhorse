@@ -28,18 +28,17 @@ public class MarketItemReader implements ItemReader<Market> {
 
     @Override
     public Market read() {
-        // If current batch is exhausted, load next batch
         if (currentIndex >= currentBatch.size()) {
             currentBatch = jdbcTemplate.query(
                     "SELECT market_id, address, city, country, brand FROM market ORDER BY id LIMIT ? OFFSET ?",
-                    new Object[]{CHUNK_SIZE, currentOffset},
                     (rs, rowNum) -> Market.builder()
                             .marketId(UUID.fromString(rs.getString("market_id")))
                             .address(rs.getString("address"))
                             .city(rs.getString("city"))
                             .country(rs.getString("country"))
                             .brand(rs.getString("brand"))
-                            .build()
+                            .build(),
+                    CHUNK_SIZE, currentOffset
             );
 
             currentOffset += CHUNK_SIZE;

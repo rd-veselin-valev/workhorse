@@ -4,13 +4,16 @@ import com.example.workhorse.data.entity.Device;
 import com.example.workhorse.data.entity.Market;
 import com.example.workhorse.data.repository.DeviceRepository;
 import com.example.workhorse.data.repository.MarketRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 @Component
@@ -20,20 +23,43 @@ public class MarketDeviceItemWriter implements ItemWriter<Market> {
     private final MarketRepository marketRepository;
     private final DeviceRepository deviceRepository;
 
+    private final List<Device> allDevices = new ArrayList<>();
+    private final AtomicInteger deviceIndex = new AtomicInteger(0);
+    private boolean remainingDevicesCompleted;
+
+    @PostConstruct
+    public void loadDevices() {
+        allDevices.addAll(deviceRepository.findAll());
+    }
+
     @Override
     public void write(Chunk<? extends Market> markets) throws Exception {
-        List<Market> savedMarkets = marketRepository.saveAll(markets.getItems().stream()
+        var savedMarkets = marketRepository.saveAll(markets.getItems().stream()
                 .map(m -> (Market) m)
                 .collect(Collectors.toList()));
 
-        for (Market savedMarket : savedMarkets) {
-            List<Device> devices = deviceRepository.findAll();
-            for (Device device : devices) {
-                device.setMarket(savedMarket);
-            }
+        var updatedDevices = new ArrayList<Device>();
 
-            deviceRepository.saveAll(devices);
+        if (!remainingDevicesCompleted) {
+            for (var i = 0; i < 400; i++) {
+                Device device = allDevices.get(deviceIndex.getAndIncrement());
+                device.setMarket(savedMarkets.get(i));
+                updatedDevices.add(device);
+            }
+            remainingDevicesCompleted = true;
         }
+
+        for (Market market : savedMarkets) {
+            for (int i = 0; i < 2; i++) {
+                if (deviceIndex.get() < allDevices.size()) {
+                    Device device = allDevices.get(deviceIndex.getAndIncrement());
+                    device.setMarket(market);
+                    updatedDevices.add(device);
+                }
+            }
+        }
+
+        deviceRepository.saveAll(updatedDevices);
     }
 }
 
