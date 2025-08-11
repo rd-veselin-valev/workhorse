@@ -30,36 +30,46 @@ public class MarketDeviceItemWriter implements ItemWriter<Market> {
     @PostConstruct
     public void loadDevices() {
         allDevices.addAll(deviceRepository.findAll());
+        System.out.printf("Loaded %d devices.\n", allDevices.size());
+        marketRepository.deleteAll();
     }
 
     @Override
     public void write(Chunk<? extends Market> markets) throws Exception {
-        var savedMarkets = marketRepository.saveAll(markets.getItems().stream()
-                .map(m -> (Market) m)
-                .collect(Collectors.toList()));
+        try {
+            System.out.println("Writing chunk of size: " + markets.getItems().size());
+            var savedMarkets = marketRepository.saveAll(markets.getItems().stream()
+                    .map(m -> (Market) m)
+                    .collect(Collectors.toList()));
+            System.out.println("Saved " + savedMarkets.size() + " markets.");
 
-        var updatedDevices = new ArrayList<Device>();
-
-        if (!remainingDevicesCompleted) {
-            for (var i = 0; i < 400; i++) {
-                Device device = allDevices.get(deviceIndex.getAndIncrement());
-                device.setMarket(savedMarkets.get(i));
-                updatedDevices.add(device);
+            var updatedDevices = new ArrayList<Device>();
+            if (!remainingDevicesCompleted) {
+                for (var i = 0; i < 400; i++) {
+                    if (deviceIndex.get() < allDevices.size()) {
+                        Device device = allDevices.get(deviceIndex.getAndIncrement());
+                        device.setMarket(savedMarkets.get(i));
+                        updatedDevices.add(device);
+                    }
+                }
+                remainingDevicesCompleted = true;
             }
-            remainingDevicesCompleted = true;
-        }
-
-        for (Market market : savedMarkets) {
-            for (int i = 0; i < 2; i++) {
-                if (deviceIndex.get() < allDevices.size()) {
-                    Device device = allDevices.get(deviceIndex.getAndIncrement());
-                    device.setMarket(market);
-                    updatedDevices.add(device);
+            for (Market market : savedMarkets) {
+                for (int i = 0; i < 2; i++) {
+                    if (deviceIndex.get() < allDevices.size()) {
+                        Device device = allDevices.get(deviceIndex.getAndIncrement());
+                        device.setMarket(market);
+                        updatedDevices.add(device);
+                    }
                 }
             }
+            System.out.println("Updating " + updatedDevices.size() + " devices.");
+            deviceRepository.saveAll(updatedDevices);
+            System.out.println("Devices saved successfully.");
+        } catch (Exception e) {
+            System.out.printf("Error while writing records: %s\n", e.getMessage());
+            throw e;
         }
-
-        deviceRepository.saveAll(updatedDevices);
     }
 }
 

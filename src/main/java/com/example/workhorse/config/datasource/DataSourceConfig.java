@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -29,23 +29,24 @@ public class DataSourceConfig {
         return properties.initializeDataSourceBuilder().build();
     }
 
-    @Bean(name = "targetDataSourceProperties")
+    @Bean(name = "dataSourceProperties")
     @Primary
     @ConfigurationProperties("spring.datasource")
-    public DataSourceProperties targetDataSourceProperties() {
+    public DataSourceProperties dataSourceProperties() {
         return new DataSourceProperties();
     }
 
     @Bean(name = "dataSource")
     @Primary
-    public DataSource targetDataSource(@Qualifier("targetDataSourceProperties") DataSourceProperties properties) {
+    public DataSource dataSource(@Qualifier("dataSourceProperties") DataSourceProperties properties) {
         return properties.initializeDataSourceBuilder().build();
     }
 
     @Bean
     @Primary
-    public PlatformTransactionManager transactionManager(@Qualifier("dataSource") DataSource ds) {
-        return new DataSourceTransactionManager(ds);
+    public PlatformTransactionManager transactionManager(
+            @Qualifier("entityManagerFactory") LocalContainerEntityManagerFactoryBean emf) {
+        return new JpaTransactionManager(emf.getObject());
     }
 
     @Bean

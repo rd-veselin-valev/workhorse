@@ -1,5 +1,6 @@
 package com.example.workhorse.data.entity;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -16,6 +17,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @SuperBuilder
 public class Market extends BaseEntity {
+    @Column(name = "market_id")
     private UUID marketId;
 
     private String address;
