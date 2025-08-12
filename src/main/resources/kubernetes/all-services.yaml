@@ -1,0 +1,192 @@
+# PersistentVolumeClaim for Postgres data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgdata-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+# Postgres Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:17-alpine
+          env:
+            - name: POSTGRES_USER
+              value: postgres
+            - name: POSTGRES_PASSWORD
+              value: root
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: pgdata-pvc
+---
+# Postgres Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  type: LoadBalancer
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+---
+# workhorse cron job
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: workhorse-cronjob
+spec:
+  schedule: "*/30 * * * *" # every 30 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: workhorse
+              image: vvalev1980/workhorse:latest
+              ports:
+                - containerPort: 8080
+              env:
+                - name: SPRING_DATASOURCE_URL
+                  value: jdbc:postgresql://postgres:5432/store-device-service
+                - name: SPRING_DATASOURCE_USERNAME
+                  value: postgres
+                - name: SPRING_DATASOURCE_PASSWORD
+                  value: root
+                - name: SOURCE_DATASOURCE_URL
+                  value: jdbc:postgresql://postgres:5432/market-master-data
+                - name: SOURCE_DATASOURCE_USERNAME
+                  value: postgres
+                - name: SOURCE_DATASOURCE_PASSWORD
+                  value: root
+                - name: SPRING_APPLICATION_NAME
+                  value: workhorse
+                - name: SERVER_PORT
+                  value: "8080"
+          restartPolicy: Never
+---
+# workhorse Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: workhorse
+spec:
+  selector:
+    app: workhorse
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# market-master-data Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: market-master-data
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: market-master-data
+  template:
+    metadata:
+      labels:
+        app: market-master-data
+    spec:
+      containers:
+        - name: market-master-data
+          image: vvalev1980/market-master-data:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/market-master-data
+            - name: SPRING_DATASOURCE_USERNAME
+              value: postgres
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: root
+            - name: SPRING_APPLICATION_NAME
+              value: market-master-data
+            - name: SERVER_PORT
+              value: "8080"
+---
+# market-master-data Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: market-master-data
+spec:
+  selector:
+    app: market-master-data
+  ports:
+    - port: 8080
+      targetPort: 8080
+---
+# store-device-service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: store-device-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: store-device-service
+  template:
+    metadata:
+      labels:
+        app: store-device-service
+    spec:
+      containers:
+        - name: store-device-service
+          image: vvalev1980/store-device-service:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/store-device-service
+            - name: SPRING_DATASOURCE_USERNAME
+              value: postgres
+            - name: SPRING_DATASOURCE_PASSWORD
+              value: root
+            - name: SPRING_APPLICATION_NAME
+              value: store-device-service
+            - name: SERVER_PORT
+              value: "8080"
+---
+# store-device-service Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: store-device-service
+spec:
+  selector:
+    app: store-device-service
+  ports:
+    - port: 8080
+      targetPort: 8080

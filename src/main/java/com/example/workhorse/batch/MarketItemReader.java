@@ -30,7 +30,6 @@ public class MarketItemReader implements ItemReader<Market> {
 
     @Override
     public Market read() {
-        log.info("Writing chunk of size: {}", CHUNK_SIZE);
         if (currentIndex >= currentBatch.size()) {
             currentBatch = jdbcTemplate.query(
                     "SELECT market_id, address, city, country, brand FROM market ORDER BY id LIMIT ? OFFSET ?",
@@ -43,6 +42,8 @@ public class MarketItemReader implements ItemReader<Market> {
                             .build(),
                     CHUNK_SIZE, currentOffset
             );
+
+            log.info("Fetched new chunk of size: {}", currentBatch.size());
 
             currentOffset += CHUNK_SIZE;
             currentIndex = 0;
