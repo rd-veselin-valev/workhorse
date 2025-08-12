@@ -1,6 +1,7 @@
 package com.example.workhorse.batch;
 
 import com.example.workhorse.data.entity.Market;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.ItemReader;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -12,6 +13,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Component
 @StepScope
 public class MarketItemReader implements ItemReader<Market> {
@@ -28,6 +30,7 @@ public class MarketItemReader implements ItemReader<Market> {
 
     @Override
     public Market read() {
+        log.info("Writing chunk of size: {}", CHUNK_SIZE);
         if (currentIndex >= currentBatch.size()) {
             currentBatch = jdbcTemplate.query(
                     "SELECT market_id, address, city, country, brand FROM market ORDER BY id LIMIT ? OFFSET ?",

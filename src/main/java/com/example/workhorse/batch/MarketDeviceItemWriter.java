@@ -6,6 +6,7 @@ import com.example.workhorse.data.repository.DeviceRepository;
 import com.example.workhorse.data.repository.MarketRepository;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
@@ -16,6 +17,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Component
 @StepScope
 @RequiredArgsConstructor
@@ -30,45 +32,41 @@ public class MarketDeviceItemWriter implements ItemWriter<Market> {
     @PostConstruct
     public void loadDevices() {
         allDevices.addAll(deviceRepository.findAll());
-        System.out.printf("Loaded %d devices.\n", allDevices.size());
         marketRepository.deleteAll();
     }
 
     @Override
     public void write(Chunk<? extends Market> markets) throws Exception {
         try {
-            System.out.println("Writing chunk of size: " + markets.getItems().size());
+            log.info("Writing chunk of size: {}", markets.getItems().size());
             var savedMarkets = marketRepository.saveAll(markets.getItems().stream()
                     .map(m -> (Market) m)
                     .collect(Collectors.toList()));
-            System.out.println("Saved " + savedMarkets.size() + " markets.");
 
             var updatedDevices = new ArrayList<Device>();
             if (!remainingDevicesCompleted) {
                 for (var i = 0; i < 400; i++) {
-                    if (deviceIndex.get() < allDevices.size()) {
-                        Device device = allDevices.get(deviceIndex.getAndIncrement());
-                        device.setMarket(savedMarkets.get(i));
-                        updatedDevices.add(device);
-                    }
+                    assignDeviceToMarket(savedMarkets.get(i), updatedDevices);
                 }
                 remainingDevicesCompleted = true;
             }
             for (Market market : savedMarkets) {
                 for (int i = 0; i < 2; i++) {
-                    if (deviceIndex.get() < allDevices.size()) {
-                        Device device = allDevices.get(deviceIndex.getAndIncrement());
-                        device.setMarket(market);
-                        updatedDevices.add(device);
-                    }
+                    assignDeviceToMarket(market, updatedDevices);
                 }
             }
-            System.out.println("Updating " + updatedDevices.size() + " devices.");
             deviceRepository.saveAll(updatedDevices);
-            System.out.println("Devices saved successfully.");
         } catch (Exception e) {
-            System.out.printf("Error while writing records: %s\n", e.getMessage());
+            log.info("Error while writing records: {}\n", e.getMessage());
             throw e;
+        }
+    }
+
+    private void assignDeviceToMarket(Market savedMarkets, ArrayList<Device> updatedDevices) {
+        if (deviceIndex.get() < allDevices.size()) {
+            Device device = allDevices.get(deviceIndex.getAndIncrement());
+            device.setMarket(savedMarkets);
+            updatedDevices.add(device);
         }
     }
 }
